@@ -37,6 +37,7 @@ return [
 
     'tmdb' => [
         'key' => env('TMDB_API_KEY'),
+        'verify_ssl' => env('TMDB_VERIFY_SSL', true),
     ],
 
 ];

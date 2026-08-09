@@ -19,11 +19,12 @@ class TmdbController extends Controller
             return response()->json(['error' => 'TMDB_API_KEY is not set'], 500);
         }
 
-        $response = Http::get(self::BASE.$path, [
-            'api_key' => $key,
-            'language' => 'en-US',
-            ...$params,
-        ]);
+        $response = Http::withOptions(['verify' => config('services.tmdb.verify_ssl', true)])
+            ->get(self::BASE.$path, [
+                'api_key' => $key,
+                'language' => 'en-US',
+                ...$params,
+            ]);
 
         return response()->json($response->json(), $response->status());
     }
