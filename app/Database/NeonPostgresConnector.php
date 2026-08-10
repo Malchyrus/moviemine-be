@@ -10,7 +10,7 @@ class NeonPostgresConnector extends PostgresConnector
     {
         $dsn = parent::getDsn($config);
 
-        if (isset($config['endpoint_id']) && $config['endpoint_id'] !== '') {
+        if (isset($config['endpoint_id']) && $config['endpoint_id'] !== '' && ! str_contains((string) ($config['host'] ?? ''), $config['endpoint_id'])) {
             $dsn .= ";options='endpoint={$config['endpoint_id']}'";
         }
 
