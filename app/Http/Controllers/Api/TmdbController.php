@@ -69,4 +69,16 @@ class TmdbController extends Controller
             'append_to_response' => 'credits,recommendations,videos',
         ]);
     }
+
+    public function watchProviders(Request $request, int $id): JsonResponse
+    {
+        return $this->proxy("/movie/{$id}/watch/providers", [
+            'watch_region' => strtoupper($request->query('region', 'US')),
+        ]);
+    }
+
+    public function watchRegions(): JsonResponse
+    {
+        return $this->proxy('/watch/providers/regions');
+    }
 }

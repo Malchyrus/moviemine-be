@@ -22,6 +22,8 @@ Route::prefix('tmdb')->group(function () {
     Route::get('/genres', [TmdbController::class, 'genres']);
     Route::get('/search', [TmdbController::class, 'search']);
     Route::get('/movie/{id}', [TmdbController::class, 'show'])->whereNumber('id');
+    Route::get('/movie/{id}/watch-providers', [TmdbController::class, 'watchProviders'])->whereNumber('id');
+    Route::get('/watch-providers/regions', [TmdbController::class, 'watchRegions']);
 });
 
 // Authenticated routes
