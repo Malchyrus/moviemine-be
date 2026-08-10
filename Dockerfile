@@ -14,6 +14,9 @@ RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoload
 
 RUN chown -R www-data:www-data storage bootstrap/cache
 
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
+
 EXPOSE 80
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
