@@ -8,16 +8,20 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('watchlists', function (Blueprint $table) {
-            $table->dropColumn('status');
-        });
+        if (! Schema::hasTable('watchlists') || ! Schema::hasColumn('watchlists', 'status')) {
+            return;
+        }
+
+        Schema::table('watchlists', fn (Blueprint $table) => $table->dropColumn('status'));
     }
 
     public function down(): void
     {
-        Schema::table('watchlists', function (Blueprint $table) {
-            $table->string('status', 20)->default('planning')
-                ->check("status IN ('planning', 'watching', 'completed', 'dropped', 'on_hold')");
-        });
+        if (Schema::hasTable('watchlists') && ! Schema::hasColumn('watchlists', 'status')) {
+            Schema::table('watchlists', function (Blueprint $table) {
+                $table->string('status', 20)->default('planning')
+                    ->check("status IN ('planning', 'watching', 'completed', 'dropped', 'on_hold')");
+            });
+        }
     }
 };

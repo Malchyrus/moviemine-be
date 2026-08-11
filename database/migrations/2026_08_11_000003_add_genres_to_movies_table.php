@@ -8,15 +8,17 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('movies', function (Blueprint $table) {
-            $table->jsonb('genres')->nullable();
-        });
+        if (! Schema::hasTable('movies') || Schema::hasColumn('movies', 'genres')) {
+            return;
+        }
+
+        Schema::table('movies', fn (Blueprint $table) => $table->jsonb('genres')->nullable());
     }
 
     public function down(): void
     {
-        Schema::table('movies', function (Blueprint $table) {
-            $table->dropColumn('genres');
-        });
+        if (Schema::hasTable('movies') && Schema::hasColumn('movies', 'genres')) {
+            Schema::table('movies', fn (Blueprint $table) => $table->dropColumn('genres'));
+        }
     }
 };

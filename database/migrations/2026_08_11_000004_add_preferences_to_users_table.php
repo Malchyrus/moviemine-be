@@ -8,15 +8,17 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->jsonb('preferences')->nullable();
-        });
+        if (! Schema::hasTable('users') || Schema::hasColumn('users', 'preferences')) {
+            return;
+        }
+
+        Schema::table('users', fn (Blueprint $table) => $table->jsonb('preferences')->nullable());
     }
 
     public function down(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn('preferences');
-        });
+        if (Schema::hasTable('users') && Schema::hasColumn('users', 'preferences')) {
+            Schema::table('users', fn (Blueprint $table) => $table->dropColumn('preferences'));
+        }
     }
 };
