@@ -4,6 +4,6 @@
 
 :{$PORT} {
     root * /app/public
-    encode zstd gzip
+    encode gzip
     php_server
 }
