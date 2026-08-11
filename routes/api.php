@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AutomationsController;
 use App\Http\Controllers\Api\CustomListController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\TmdbController;
@@ -30,6 +31,7 @@ Route::prefix('tmdb')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
+    Route::patch('/auth/me', [AuthController::class, 'updateMe']);
 
     // Library / watchlist
     Route::get('/movies', [WatchlistController::class, 'index']);
@@ -45,7 +47,15 @@ Route::middleware('auth:sanctum')->group(function () {
     // Custom lists
     Route::get('/lists', [CustomListController::class, 'index']);
     Route::post('/lists', [CustomListController::class, 'store']);
+    Route::patch('/lists/{id}', [CustomListController::class, 'update'])->whereNumber('id');
     Route::delete('/lists/{id}', [CustomListController::class, 'destroy'])->whereNumber('id');
     Route::post('/lists/{listId}/movies', [CustomListController::class, 'addMovie'])->whereNumber('listId');
     Route::delete('/lists/{listId}/movies/{tmdbId}', [CustomListController::class, 'removeMovie'])->whereNumber('listId', 'tmdbId');
+    Route::post('/lists/{listId}/move', [CustomListController::class, 'move'])->whereNumber('listId');
+
+    // Automations
+    Route::get('/automations', [AutomationsController::class, 'index']);
+    Route::post('/automations', [AutomationsController::class, 'store']);
+    Route::patch('/automations/{id}', [AutomationsController::class, 'update'])->whereNumber('id');
+    Route::delete('/automations/{id}', [AutomationsController::class, 'destroy'])->whereNumber('id');
 });

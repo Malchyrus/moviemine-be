@@ -26,6 +26,7 @@ class MovieCache
             'release_date' => $data['release_date'] ?? null,
             'vote_average' => $data['vote_average'] ?? null,
             'media_type' => $data['media_type'] ?? 'movie',
+            'genres' => $data['genres'] ?? null,
         ]);
     }
 

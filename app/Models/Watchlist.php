@@ -10,7 +10,6 @@ class Watchlist extends Model
     protected $fillable = [
         'user_id',
         'movie_id',
-        'status',
         'progress',
         'rating',
         'favorite',
@@ -23,6 +22,8 @@ class Watchlist extends Model
         return [
             'rating' => 'float',
             'favorite' => 'boolean',
+            'rewatch_count' => 'integer',
+            'progress' => 'integer',
             'watched_at' => 'datetime',
         ];
     }

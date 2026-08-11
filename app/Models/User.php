@@ -27,6 +27,7 @@ class User extends Authenticatable
         'password',
         'avatar',
         'bio',
+        'preferences',
     ];
 
     /**
@@ -49,7 +50,22 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'preferences' => 'array',
         ];
+    }
+
+    public function preferencesOrDefault(): array
+    {
+        return array_merge([
+            'background' => null,
+            'auto_move_watched' => true,
+            'default_add_list_id' => null,
+        ], $this->preferences ?? []);
+    }
+
+    public function automations(): HasMany
+    {
+        return $this->hasMany(Automation::class);
     }
 
     public function watchlists(): HasMany

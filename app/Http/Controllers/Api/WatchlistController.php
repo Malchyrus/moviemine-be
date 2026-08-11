@@ -3,7 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\CustomList;
+use App\Models\CustomListMovie;
+use App\Models\User;
 use App\Models\Watchlist;
+use App\Services\LibraryService;
 use App\Services\MovieCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,12 +18,14 @@ class WatchlistController extends Controller
     {
         $user = $request->user();
 
+        app(LibraryService::class)->ensureDefaultLists($user);
+
         $entries = Watchlist::query()
             ->where('user_id', $user->id)
             ->with('movie')
             ->orderByDesc('created_at')
             ->get()
-            ->map(fn (Watchlist $w) => $this->formatEntry($w));
+            ->map(fn (Watchlist $w) => $this->formatEntry($user, $w));
 
         return response()->json(['movies' => $entries]);
     }
@@ -33,6 +39,9 @@ class WatchlistController extends Controller
             'backdrop_path' => ['nullable', 'string'],
             'release_date' => ['nullable', 'date'],
             'vote_average' => ['nullable', 'numeric', 'between:0,10'],
+            'genres' => ['nullable', 'array'],
+            'genres.*.id' => ['integer'],
+            'genres.*.name' => ['string'],
         ]);
 
         $user = $request->user();
@@ -46,17 +55,33 @@ class WatchlistController extends Controller
         if ($exists) {
             return response()->json([
                 'error' => 'already exists',
-                'entry' => $this->formatEntry($exists),
+                'entry' => $this->formatEntry($user, $exists->load('movie')),
             ], 409);
         }
 
-        $entry = Watchlist::query()->create([
-            'user_id' => $user->id,
-            'movie_id' => $movie->id,
-            'status' => 'planning',
-        ]);
+        $service = app(LibraryService::class);
+        $service->ensureDefaultLists($user);
 
-        return response()->json($this->formatEntry($entry->load('movie')), 201);
+        $prefs = $user->preferencesOrDefault();
+        $target = null;
+
+        if ($prefs['default_add_list_id']) {
+            $target = CustomList::query()
+                ->where('id', $prefs['default_add_list_id'])
+                ->where('user_id', $user->id)
+                ->first();
+        }
+
+        $target ??= $service->defaultList($user, 'planning');
+
+        $service->addToList($user, $movie, $target);
+
+        $entry = Watchlist::query()
+            ->where('user_id', $user->id)
+            ->where('movie_id', $movie->id)
+            ->first();
+
+        return response()->json($this->formatEntry($user, $entry->load('movie')), 201);
     }
 
     public function update(Request $request, int $tmdbId): JsonResponse
@@ -86,12 +111,23 @@ class WatchlistController extends Controller
             return response()->json(['error' => 'not found'], 404);
         }
 
+        $service = app(LibraryService::class);
+
         if (array_key_exists('watched', $validated)) {
-            $entry->status = $validated['watched'] ? 'completed' : 'planning';
-            $entry->watched_at = $validated['watched'] ? now() : null;
+            $service->setWatched($user, $movie, (bool) $validated['watched']);
         }
 
-        foreach (['status', 'progress', 'favorite', 'rewatch_count', 'rating'] as $field) {
+        if (array_key_exists('status', $validated)) {
+            $service->setStatus($user, $movie, $validated['status']);
+            $entry->watched_at = $validated['status'] === 'completed' ? now() : null;
+            $entry->save();
+        }
+
+        if (array_key_exists('rating', $validated)) {
+            $service->setRating($user, $movie, $validated['rating']);
+        }
+
+        foreach (['progress', 'favorite', 'rewatch_count'] as $field) {
             if (array_key_exists($field, $validated)) {
                 $entry->{$field} = $validated[$field];
             }
@@ -99,7 +135,7 @@ class WatchlistController extends Controller
 
         $entry->save();
 
-        return response()->json($this->formatEntry($entry->fresh('movie')));
+        return response()->json($this->formatEntry($user, $entry->fresh('movie')));
     }
 
     public function destroy(Request $request, int $tmdbId): JsonResponse
@@ -120,15 +156,19 @@ class WatchlistController extends Controller
             return response()->json(['error' => 'not found'], 404);
         }
 
+        CustomListMovie::query()
+            ->where('movie_id', $movie->id)
+            ->whereHas('list', fn ($q) => $q->where('user_id', $user->id))
+            ->delete();
+
         return response()->json(['ok' => true]);
     }
 
-    /**
-     * Shape an entry for the React frontend.
-     */
-    private function formatEntry(Watchlist $entry): array
+    private function formatEntry(User $user, Watchlist $entry): array
     {
+        $service = app(LibraryService::class);
         $movie = $entry->movie;
+        $status = $service->statusOf($user, $movie);
 
         return [
             'movie' => [
@@ -138,11 +178,12 @@ class WatchlistController extends Controller
                 'backdrop_path' => $movie->backdrop_path,
                 'vote_average' => $movie->vote_average,
                 'release_date' => $movie->release_date?->toDateString(),
+                'genres' => $movie->genres ?? [],
             ],
-            'watched' => $entry->status === 'completed',
+            'watched' => $status === 'completed',
             'rating' => $entry->rating !== null ? (float) $entry->rating : null,
             'addedAt' => $entry->created_at->valueOf(),
-            'status' => $entry->status,
+            'status' => $status,
             'progress' => $entry->progress,
             'favorite' => (bool) $entry->favorite,
             'rewatch_count' => $entry->rewatch_count,

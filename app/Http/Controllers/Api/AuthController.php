@@ -27,6 +27,8 @@ class AuthController extends Controller
             'password' => $validated['password'],
         ]);
 
+        app(\App\Services\LibraryService::class)->ensureDefaultLists($user);
+
         return response()->json([
             'user' => $user,
             'token' => $user->createToken('web')->plainTextToken,
@@ -62,5 +64,38 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         return response()->json(['user' => $request->user()]);
+    }
+
+    public function updateMe(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'name' => ['sometimes', 'string', 'max:255'],
+            'username' => ['sometimes', 'nullable', 'string', 'max:50', 'unique:users,username,'.$user->id],
+            'avatar' => ['sometimes', 'nullable', 'string'],
+            'bio' => ['sometimes', 'nullable', 'string'],
+            'preferences' => ['sometimes', 'array'],
+            'preferences.background' => ['sometimes', 'nullable', 'string'],
+            'preferences.auto_move_watched' => ['sometimes', 'boolean'],
+            'preferences.default_add_list_id' => ['sometimes', 'nullable', 'integer'],
+        ]);
+
+        foreach (['name', 'username', 'avatar', 'bio'] as $field) {
+            if (array_key_exists($field, $validated)) {
+                $user->{$field} = $validated[$field];
+            }
+        }
+
+        if (array_key_exists('preferences', $validated)) {
+            $user->preferences = array_merge(
+                $user->preferencesOrDefault(),
+                $validated['preferences'],
+            );
+        }
+
+        $user->save();
+
+        return response()->json(['user' => $user->fresh()]);
     }
 }

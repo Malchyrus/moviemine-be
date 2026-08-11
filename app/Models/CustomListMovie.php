@@ -10,7 +10,15 @@ class CustomListMovie extends Model
     protected $fillable = [
         'list_id',
         'movie_id',
+        'position',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'position' => 'integer',
+        ];
+    }
 
     public function list(): BelongsTo
     {

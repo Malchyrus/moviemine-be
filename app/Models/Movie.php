@@ -15,6 +15,7 @@ class Movie extends Model
         'release_date',
         'vote_average',
         'media_type',
+        'genres',
     ];
 
     protected function casts(): array
@@ -22,6 +23,7 @@ class Movie extends Model
         return [
             'release_date' => 'date',
             'vote_average' => 'float',
+            'genres' => 'array',
         ];
     }
 

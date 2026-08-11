@@ -13,12 +13,17 @@ class CustomList extends Model
         'name',
         'description',
         'is_public',
+        'position',
+        'is_default',
+        'type',
     ];
 
     protected function casts(): array
     {
         return [
             'is_public' => 'boolean',
+            'is_default' => 'boolean',
+            'position' => 'integer',
         ];
     }
 
@@ -29,6 +34,17 @@ class CustomList extends Model
 
     public function movies(): HasMany
     {
-        return $this->hasMany(CustomListMovie::class);
+        return $this->hasMany(CustomListMovie::class)->orderBy('position')->orderBy('id');
+    }
+
+    public static function defaultTypes(): array
+    {
+        return [
+            'planning' => 'Plan to Watch',
+            'watching' => 'Watching',
+            'completed' => 'Watched',
+            'dropped' => 'Dropped',
+            'on_hold' => 'On Hold',
+        ];
     }
 }
