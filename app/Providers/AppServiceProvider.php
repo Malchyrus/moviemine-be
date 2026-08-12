@@ -3,9 +3,12 @@
 namespace App\Providers;
 
 use App\Database\NeonPostgresConnector;
+use App\Support\DbMetrics;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -23,6 +26,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->app->singleton(DbMetrics::class);
+
+        DB::listen(function (QueryExecuted $query): void {
+            app(DbMetrics::class)->record($query);
+        });
+
         $this->app->make(ExceptionHandler::class)->renderable(
             function (AuthenticationException $e, Request $request) {
                 if ($request->is('api/*')) {

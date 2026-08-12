@@ -17,6 +17,10 @@ class LibraryService
      */
     public function ensureDefaultLists(User $user): void
     {
+        if (($user->preferences['lists_initialized'] ?? false) === true) {
+            return;
+        }
+
         $deletedTypes = $user->preferences['deleted_default_types'] ?? [];
 
         $existing = $user->customLists()
@@ -43,6 +47,11 @@ class LibraryService
         }
 
         $this->ensureDefaultAutomation($user);
+
+        $preferences = $user->preferences ?? [];
+        $preferences['lists_initialized'] = true;
+        $user->preferences = $preferences;
+        $user->save();
     }
 
     /**
@@ -210,6 +219,32 @@ class LibraryService
             ->first();
 
         return $membership?->list->type;
+    }
+
+    /**
+     * Map movie ids to their default list type in a single query.
+     */
+    public function statusesOf(User $user, array $movieIds): array
+    {
+        if (empty($movieIds)) {
+            return [];
+        }
+
+        $memberships = CustomListMovie::query()
+            ->whereIn('movie_id', $movieIds)
+            ->whereHas('list', fn ($q) => $q
+                ->where('user_id', $user->id)
+                ->where('is_default', true))
+            ->with('list')
+            ->get();
+
+        $statuses = [];
+
+        foreach ($memberships as $membership) {
+            $statuses[$membership->movie_id] = $membership->list->type;
+        }
+
+        return $statuses;
     }
 
     /**

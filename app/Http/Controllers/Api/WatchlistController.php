@@ -24,10 +24,14 @@ class WatchlistController extends Controller
             ->where('user_id', $user->id)
             ->with('movie')
             ->orderByDesc('created_at')
-            ->get()
-            ->map(fn (Watchlist $w) => $this->formatEntry($user, $w));
+            ->get();
 
-        return response()->json(['movies' => $entries]);
+        $service = app(LibraryService::class);
+        $statuses = $service->statusesOf($user, $entries->pluck('movie_id')->all());
+
+        return response()->json([
+            'movies' => $entries->map(fn (Watchlist $w) => $this->formatEntry($user, $w, $statuses)),
+        ]);
     }
 
     public function store(Request $request): JsonResponse
@@ -164,11 +168,11 @@ class WatchlistController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    private function formatEntry(User $user, Watchlist $entry): array
+    private function formatEntry(User $user, Watchlist $entry, array $statuses = []): array
     {
         $service = app(LibraryService::class);
         $movie = $entry->movie;
-        $status = $service->statusOf($user, $movie);
+        $status = $statuses[$entry->movie_id] ?? $service->statusOf($user, $movie);
 
         return [
             'movie' => [
