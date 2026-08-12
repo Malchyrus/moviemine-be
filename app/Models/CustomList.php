@@ -34,7 +34,7 @@ class CustomList extends Model
 
     public function movies(): HasMany
     {
-        return $this->hasMany(CustomListMovie::class)->orderBy('position')->orderBy('id');
+        return $this->hasMany(CustomListMovie::class, 'list_id')->orderBy('position')->orderBy('id');
     }
 
     public static function defaultTypes(): array
