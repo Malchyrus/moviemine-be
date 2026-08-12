@@ -102,7 +102,7 @@ return [
 
         'pgsql_direct' => [
             'driver' => 'pgsql',
-            'url' => env('DB_URL_DIRECT'),
+            'url' => env('DB_URL_DIRECT', str_replace('-pooler', '', env('DB_URL'))),
             'host' => env('DB_HOST_DIRECT', str_replace('-pooler', '', env('DB_HOST', '127.0.0.1'))),
             'port' => env('DB_PORT', '5432'),
             'database' => env('DB_DATABASE', 'laravel'),
