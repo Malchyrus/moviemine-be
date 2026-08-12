@@ -312,9 +312,28 @@ class LibraryService
             '>=' => $actual >= $expected,
             '<' => $actual < $expected,
             '<=' => $actual <= $expected,
-            'contains' => is_array($actual) && in_array($expected, $actual, false),
+            'contains' => is_array($actual) && $this->listContains($actual, $expected),
             default => true,
         };
+    }
+
+    private function listContains(array $actual, mixed $expected): bool
+    {
+        foreach ($actual as $item) {
+            if (is_array($item)) {
+                if (in_array($expected, $item, true)) {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if ($item == $expected) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function ensureWatchlistRow(User $user, Movie $movie): Watchlist
