@@ -180,7 +180,7 @@ class WatchlistController extends Controller
                 'release_date' => $movie->release_date?->toDateString(),
                 'genres' => $movie->genres ?? [],
             ],
-            'watched' => $status === 'completed',
+            'watched' => (bool) $entry->watched_at,
             'rating' => $entry->rating !== null ? (float) $entry->rating : null,
             'addedAt' => $entry->created_at->valueOf(),
             'status' => $status,

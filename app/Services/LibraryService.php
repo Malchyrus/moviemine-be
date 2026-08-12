@@ -12,10 +12,13 @@ use App\Models\User;
 class LibraryService
 {
     /**
-     * Make sure the user has the five default lists.
+     * Make sure the user has the five default lists and the default
+     * "move watched to Watched" automation rule.
      */
     public function ensureDefaultLists(User $user): void
     {
+        $deletedTypes = $user->preferences['deleted_default_types'] ?? [];
+
         $existing = $user->customLists()
             ->where('is_default', true)
             ->pluck('type')
@@ -24,7 +27,7 @@ class LibraryService
         $position = (int) $user->customLists()->max('position');
 
         foreach (CustomList::defaultTypes() as $type => $name) {
-            if ($existing->has($type)) {
+            if ($existing->has($type) || in_array($type, $deletedTypes, true)) {
                 continue;
             }
 
@@ -38,17 +41,60 @@ class LibraryService
                 'position' => $position,
             ]);
         }
+
+        $this->ensureDefaultAutomation($user);
+    }
+
+    /**
+     * Seed the default "when a movie is watched, move it to the Watched
+     * list" rule, unless the user already has one targeting their Watched
+     * list or deleted that list.
+     */
+    private function ensureDefaultAutomation(User $user): void
+    {
+        $completed = $user->customLists()
+            ->where('is_default', true)
+            ->where('type', 'completed')
+            ->first();
+
+        if (! $completed) {
+            return;
+        }
+
+        $has = $user->automations()
+            ->where('event', 'movie_watched')
+            ->get()
+            ->contains(fn (Automation $a) => ($a->condition['field'] ?? null) === 'watched'
+                && ($a->action['type'] ?? null) === 'move_to_list'
+                && ($a->action['list_id'] ?? null) === $completed->id);
+
+        if ($has) {
+            return;
+        }
+
+        $user->automations()->create([
+            'name' => 'Move watched movies to “Watched”',
+            'event' => 'movie_watched',
+            'condition' => ['field' => 'watched', 'op' => '=', 'value' => true],
+            'action' => ['type' => 'move_to_list', 'list_id' => $completed->id],
+            'enabled' => true,
+        ]);
     }
 
     /**
      * Add a movie to a list. A movie can live in any number of custom lists,
-     * but only one default list at a time.
+     * but only one default list at a time. A null list still saves the movie
+     * to the library (watchlist row) without assigning it to a list.
      */
-    public function addToList(User $user, Movie $movie, CustomList $list): CustomListMovie
+    public function addToList(User $user, Movie $movie, ?CustomList $list): ?CustomListMovie
     {
         $this->ensureDefaultLists($user);
 
         $this->ensureWatchlistRow($user, $movie);
+
+        if (! $list) {
+            return null;
+        }
 
         if ($list->is_default) {
             $this->removeFromDefaultLists($user, $movie, $list->id);
@@ -98,26 +144,15 @@ class LibraryService
     }
 
     /**
-     * Mark a movie watched/unwatched, honouring the auto-move preference.
+     * Mark a movie watched/unwatched. Watched status is stored on the
+     * watchlist row; any list movement is handled by the user's automation
+     * rules (event "movie_watched").
      */
     public function setWatched(User $user, Movie $movie, bool $watched): void
     {
         $entry = $this->ensureWatchlistRow($user, $movie);
         $entry->watched_at = $watched ? now() : null;
         $entry->save();
-
-        $prefs = $user->preferencesOrDefault();
-
-        if (! ($prefs['auto_move_watched'] ?? true)) {
-            return;
-        }
-
-        $targetType = $watched ? 'completed' : 'planning';
-        $target = $this->defaultList($user, $targetType);
-
-        if ($target) {
-            $this->moveToList($user, $movie, $target);
-        }
 
         $this->evaluateAutomations($user, 'movie_watched', $movie, $entry->fresh());
     }
@@ -229,6 +264,11 @@ class LibraryService
 
         $actual = $context[$condition['field']] ?? null;
         $expected = $condition['value'];
+
+        if ($condition['field'] === 'watched') {
+            $actual = (bool) $actual;
+            $expected = filter_var($expected, FILTER_VALIDATE_BOOLEAN);
+        }
 
         return match ($condition['op']) {
             '=' => $actual == $expected,

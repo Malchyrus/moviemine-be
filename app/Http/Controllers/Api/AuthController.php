@@ -77,7 +77,6 @@ class AuthController extends Controller
             'bio' => ['sometimes', 'nullable', 'string'],
             'preferences' => ['sometimes', 'array'],
             'preferences.background' => ['sometimes', 'nullable', 'string'],
-            'preferences.auto_move_watched' => ['sometimes', 'boolean'],
             'preferences.default_add_list_id' => ['sometimes', 'nullable', 'integer'],
         ]);
 

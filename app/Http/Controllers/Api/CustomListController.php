@@ -88,8 +88,16 @@ class CustomListController extends Controller
             return response()->json(['error' => 'not found'], 404);
         }
 
-        if ($list->is_default) {
-            return response()->json(['error' => 'default lists cannot be deleted'], 400);
+        if ($list->is_default && $list->type) {
+            $preferences = $user->preferences ?? [];
+            $deleted = $preferences['deleted_default_types'] ?? [];
+
+            if (! in_array($list->type, $deleted, true)) {
+                $deleted[] = $list->type;
+                $preferences['deleted_default_types'] = $deleted;
+                $user->preferences = $preferences;
+                $user->save();
+            }
         }
 
         $list->delete();
