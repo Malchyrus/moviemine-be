@@ -58,4 +58,40 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/automations', [AutomationsController::class, 'store']);
     Route::patch('/automations/{id}', [AutomationsController::class, 'update'])->whereNumber('id');
     Route::delete('/automations/{id}', [AutomationsController::class, 'destroy'])->whereNumber('id');
+
+    // TEMP DEBUG - remove after diagnosing library 500
+    Route::get('/debug/lists', function (Request $request) {
+        $out = [];
+
+        try {
+            $user = $request->user();
+            $lists = $user->customLists()->where('is_default', true)->pluck('type')->toArray();
+            $out['existing_defaults'] = $lists;
+            $out['total_lists'] = $user->customLists()->count();
+        } catch (\Throwable $e) {
+            $out['read_custom_lists'] = get_class($e).': '.$e->getMessage();
+        }
+
+        try {
+            app(\App\Services\LibraryService::class)->ensureDefaultLists($request->user());
+            $out['ensureDefaultLists'] = 'ok';
+        } catch (\Throwable $e) {
+            $out['ensureDefaultLists'] = get_class($e).': '.$e->getMessage();
+        }
+
+        try {
+            $lists = \App\Models\CustomList::query()
+                ->where('user_id', $request->user()->id)
+                ->withCount('movies')
+                ->with('movies.movie')
+                ->orderBy('position')
+                ->orderBy('id')
+                ->get();
+            $out['index_query'] = 'ok count='.$lists->count();
+        } catch (\Throwable $e) {
+            $out['index_query'] = get_class($e).': '.$e->getMessage();
+        }
+
+        return response()->json($out);
+    });
 });
