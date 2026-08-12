@@ -94,12 +94,12 @@ Health check: `curl http://localhost:8000/api/health`
    - `TMDB_API_KEY`
    - `TMDB_VERIFY_SSL=true`
    - `LOG_CHANNEL=stderr`
-3. Deploy. Note its URL, e.g. `https://moviemine-be-production.up.railway.app`
+3. Deploy. Note its URL, e.g. `https://moviemine-production.up.railway.app`
 
 ### 3. Vercel (frontend)
 
 1. Import `malchyrus/moviemine` into Vercel (auto-detects Vite).
-2. Add environment variable `VITE_API_URL=https://moviemine-be-production.up.railway.app`
+2. Add environment variable `VITE_API_URL=https://moviemine-production.up.railway.app`
 3. Deploy. `vercel.json` provides the SPA rewrite so client-side routes work.
 
 ## Health check
