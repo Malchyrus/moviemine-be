@@ -6,9 +6,14 @@ use App\Http\Controllers\Api\CustomListController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\TmdbController;
 use App\Http\Controllers\Api\WatchlistController;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/health', fn () => response()->json(['ok' => true]));
+Route::get('/health', function () {
+    DB::select('select 1');
+
+    return response()->json(['ok' => true]);
+});
 
 // Auth
 Route::post('/auth/register', [AuthController::class, 'register']);

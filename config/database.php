@@ -17,7 +17,7 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', env('DB_URL') ? 'pgsql_direct' : 'sqlite'),
+    'default' => env('DB_CONNECTION', env('DB_URL') ? 'pgsql' : 'sqlite'),
 
     /*
     |--------------------------------------------------------------------------
@@ -98,6 +98,7 @@ return [
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
             'endpoint_id' => env('DB_ENDPOINT_ID'),
+            'options' => [PDO::ATTR_PERSISTENT => true],
         ],
 
         'pgsql_direct' => [
@@ -114,6 +115,7 @@ return [
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
             'endpoint_id' => env('DB_ENDPOINT_ID'),
+            'options' => [PDO::ATTR_PERSISTENT => true],
         ],
 
         'sqlsrv' => [

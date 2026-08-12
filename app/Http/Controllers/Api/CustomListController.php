@@ -179,7 +179,7 @@ class CustomListController extends Controller
             app(LibraryService::class)->removeFromList($user, $movie, $list);
         }
 
-        return response()->json(['ok' => true]);
+        return response()->json($this->formatList($list->fresh(['movies.movie'])));
     }
 
     private function ownList(User $user, int $id): ?CustomList
