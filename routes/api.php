@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AutomationsController;
 use App\Http\Controllers\Api\CustomListController;
+use App\Http\Controllers\Api\EpisodeProgressController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\TmdbController;
 use App\Http\Controllers\Api\WatchlistController;
@@ -22,13 +23,24 @@ Route::post('/auth/login', [AuthController::class, 'login']);
 // TMDB proxy
 Route::prefix('tmdb')->group(function () {
     Route::get('/trending', [TmdbController::class, 'trending']);
+    Route::get('/trending/all', [TmdbController::class, 'trendingAll']);
+    Route::get('/trending/tv', [TmdbController::class, 'trendingTv']);
     Route::get('/popular', [TmdbController::class, 'popular']);
     Route::get('/upcoming', [TmdbController::class, 'upcoming']);
     Route::get('/top-rated', [TmdbController::class, 'topRated']);
+    Route::get('/tv/popular', [TmdbController::class, 'popularTv']);
+    Route::get('/tv/top-rated', [TmdbController::class, 'topRatedTv']);
+    Route::get('/tv/airing-today', [TmdbController::class, 'airingToday']);
     Route::get('/genres', [TmdbController::class, 'genres']);
+    Route::get('/genres/tv', [TmdbController::class, 'genresTv']);
     Route::get('/search', [TmdbController::class, 'search']);
+    Route::get('/search/multi', [TmdbController::class, 'searchMulti']);
+    Route::get('/search/tv', [TmdbController::class, 'searchTv']);
     Route::get('/movie/{id}', [TmdbController::class, 'show'])->whereNumber('id');
     Route::get('/movie/{id}/watch-providers', [TmdbController::class, 'watchProviders'])->whereNumber('id');
+    Route::get('/tv/{id}', [TmdbController::class, 'tvShow'])->whereNumber('id');
+    Route::get('/tv/{id}/season/{season}', [TmdbController::class, 'tvSeason'])->whereNumber('id', 'season');
+    Route::get('/tv/{id}/watch-providers', [TmdbController::class, 'tvWatchProviders'])->whereNumber('id');
     Route::get('/watch-providers/regions', [TmdbController::class, 'watchRegions']);
 });
 
@@ -47,6 +59,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/movies', [WatchlistController::class, 'store']);
     Route::patch('/movies/{tmdbId}', [WatchlistController::class, 'update'])->whereNumber('tmdbId');
     Route::delete('/movies/{tmdbId}', [WatchlistController::class, 'destroy'])->whereNumber('tmdbId');
+    Route::patch('/movies/{tmdbId}/episodes', [EpisodeProgressController::class, 'toggle'])->whereNumber('tmdbId');
 
     // Reviews
     Route::get('/reviews', [ReviewController::class, 'index']);

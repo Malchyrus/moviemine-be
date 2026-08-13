@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CustomList;
 use App\Models\CustomListMovie;
+use App\Models\EpisodeProgress;
 use App\Models\User;
 use App\Models\Watchlist;
 use App\Services\LibraryService;
@@ -43,6 +44,7 @@ class WatchlistController extends Controller
             'backdrop_path' => ['nullable', 'string'],
             'release_date' => ['nullable', 'date'],
             'vote_average' => ['nullable', 'numeric', 'between:0,10'],
+            'media_type' => ['nullable', 'in:movie,tv'],
             'genres' => ['nullable', 'array'],
             'genres.*.id' => ['integer'],
             'genres.*.name' => ['string'],
@@ -97,10 +99,11 @@ class WatchlistController extends Controller
             'progress' => ['nullable', 'integer', 'min:0'],
             'favorite' => ['nullable', 'boolean'],
             'rewatch_count' => ['nullable', 'integer', 'min:0'],
+            'media_type' => ['nullable', 'in:movie,tv'],
         ]);
 
         $user = $request->user();
-        $movie = app(MovieCache::class)->findByTmdb($tmdbId);
+        $movie = app(MovieCache::class)->findByTmdb($tmdbId, $validated['media_type'] ?? 'movie');
 
         if (! $movie) {
             return response()->json(['error' => 'not found'], 404);
@@ -145,7 +148,7 @@ class WatchlistController extends Controller
     public function destroy(Request $request, int $tmdbId): JsonResponse
     {
         $user = $request->user();
-        $movie = app(MovieCache::class)->findByTmdb($tmdbId);
+        $movie = app(MovieCache::class)->findByTmdb($tmdbId, $request->query('media_type', 'movie'));
 
         if (! $movie) {
             return response()->json(['error' => 'not found'], 404);
@@ -159,6 +162,11 @@ class WatchlistController extends Controller
         if (! $deleted) {
             return response()->json(['error' => 'not found'], 404);
         }
+
+        EpisodeProgress::query()
+            ->where('user_id', $user->id)
+            ->where('movie_id', $movie->id)
+            ->delete();
 
         CustomListMovie::query()
             ->where('movie_id', $movie->id)
@@ -183,8 +191,13 @@ class WatchlistController extends Controller
                 'vote_average' => $movie->vote_average,
                 'release_date' => $movie->release_date?->toDateString(),
                 'genres' => $movie->genres ?? [],
+                'media_type' => $movie->media_type ?? 'movie',
+                'number_of_seasons' => $movie->number_of_seasons,
+                'number_of_episodes' => $movie->number_of_episodes,
             ],
             'watched' => (bool) $entry->watched_at,
+            'watched_episodes' => EpisodeProgress::watchedKeys($user, $movie),
+            'total_episodes' => EpisodeProgress::totalEpisodes($movie),
             'rating' => $entry->rating !== null ? (float) $entry->rating : null,
             'addedAt' => $entry->created_at->valueOf(),
             'status' => $status,

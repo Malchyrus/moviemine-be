@@ -114,6 +114,7 @@ class CustomListController extends Controller
             'backdrop_path' => ['nullable', 'string'],
             'release_date' => ['nullable', 'date'],
             'vote_average' => ['nullable', 'numeric', 'between:0,10'],
+            'media_type' => ['nullable', 'in:movie,tv'],
             'genres' => ['nullable', 'array'],
             'genres.*.id' => ['integer'],
             'genres.*.name' => ['string'],
@@ -138,6 +139,7 @@ class CustomListController extends Controller
         $validated = $request->validate([
             'tmdb_id' => ['required', 'integer'],
             'from_list_id' => ['nullable', 'integer'],
+            'media_type' => ['nullable', 'in:movie,tv'],
         ]);
 
         $user = $request->user();
@@ -147,7 +149,7 @@ class CustomListController extends Controller
             return response()->json(['error' => 'not found'], 404);
         }
 
-        $movie = app(MovieCache::class)->findByTmdb($validated['tmdb_id']);
+        $movie = app(MovieCache::class)->findByTmdb($validated['tmdb_id'], $validated['media_type'] ?? 'movie');
 
         if (! $movie) {
             return response()->json(['error' => 'not found'], 404);
@@ -173,7 +175,7 @@ class CustomListController extends Controller
             return response()->json(['error' => 'not found'], 404);
         }
 
-        $movie = app(MovieCache::class)->findByTmdb($tmdbId);
+        $movie = app(MovieCache::class)->findByTmdb($tmdbId, request()->query('media_type', 'movie'));
 
         if ($movie) {
             app(LibraryService::class)->removeFromList($user, $movie, $list);
@@ -221,6 +223,9 @@ class CustomListController extends Controller
             'vote_average' => $movie->vote_average,
             'release_date' => $movie->release_date?->toDateString(),
             'genres' => $movie->genres ?? [],
+            'media_type' => $movie->media_type ?? 'movie',
+            'number_of_seasons' => $movie->number_of_seasons,
+            'number_of_episodes' => $movie->number_of_episodes,
         ];
     }
 }

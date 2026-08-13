@@ -57,9 +57,57 @@ class TmdbController extends Controller
         return $this->proxy('/genre/movie/list');
     }
 
+    public function genresTv(): JsonResponse
+    {
+        return $this->proxy('/genre/tv/list');
+    }
+
+    public function trendingAll(): JsonResponse
+    {
+        return $this->proxy('/trending/all/week');
+    }
+
+    public function trendingTv(): JsonResponse
+    {
+        return $this->proxy('/trending/tv/week');
+    }
+
+    public function popularTv(): JsonResponse
+    {
+        return $this->proxy('/tv/popular');
+    }
+
+    public function topRatedTv(): JsonResponse
+    {
+        return $this->proxy('/tv/top_rated');
+    }
+
+    public function airingToday(): JsonResponse
+    {
+        return $this->proxy('/tv/airing_today');
+    }
+
     public function search(Request $request): JsonResponse
     {
         return $this->proxy('/search/movie', [
+            'query' => $request->query('q', ''),
+            'page' => $request->query('page', 1),
+            'include_adult' => 'false',
+        ]);
+    }
+
+    public function searchMulti(Request $request): JsonResponse
+    {
+        return $this->proxy('/search/multi', [
+            'query' => $request->query('q', ''),
+            'page' => $request->query('page', 1),
+            'include_adult' => 'false',
+        ]);
+    }
+
+    public function searchTv(Request $request): JsonResponse
+    {
+        return $this->proxy('/search/tv', [
             'query' => $request->query('q', ''),
             'page' => $request->query('page', 1),
             'include_adult' => 'false',
@@ -73,9 +121,28 @@ class TmdbController extends Controller
         ]);
     }
 
+    public function tvShow(Request $request, int $id): JsonResponse
+    {
+        return $this->proxy("/tv/{$id}", [
+            'append_to_response' => 'credits,recommendations,videos',
+        ]);
+    }
+
+    public function tvSeason(Request $request, int $id, int $season): JsonResponse
+    {
+        return $this->proxy("/tv/{$id}/season/{$season}");
+    }
+
     public function watchProviders(Request $request, int $id): JsonResponse
     {
         return $this->proxy("/movie/{$id}/watch/providers", [
+            'watch_region' => strtoupper($request->query('region', 'US')),
+        ]);
+    }
+
+    public function tvWatchProviders(Request $request, int $id): JsonResponse
+    {
+        return $this->proxy("/tv/{$id}/watch/providers", [
             'watch_region' => strtoupper($request->query('region', 'US')),
         ]);
     }
@@ -86,9 +153,10 @@ class TmdbController extends Controller
     }
 
     /**
-     * Personal recommendations built from the user's strongly-liked movies
-     * (watched, rated 7+, or favorited). Fetches TMDB "recommendations" for
-     * the top few seed movies concurrently, then merges and ranks them.
+     * Personal recommendations built from the user's strongly-liked titles
+     * (watched, rated 7+, or favorited) across movies and TV shows. Fetches
+     * TMDB "recommendations" for the top few seed titles concurrently, then
+     * merges and ranks them into one mixed list.
      */
     public function recommendations(Request $request): JsonResponse
     {
@@ -108,6 +176,7 @@ class TmdbController extends Controller
         $seeds = $liked
             ->map(fn (Watchlist $entry) => [
                 'id' => $entry->movie->tmdb_id,
+                'media_type' => $entry->movie->media_type ?? 'movie',
                 'weight' => $this->seedWeight($entry),
             ])
             ->filter(fn (array $seed) => $seed['id'] !== null)
@@ -120,7 +189,9 @@ class TmdbController extends Controller
             return response()->json(['results' => []]);
         }
 
-        $cacheKey = 'recommendations:'.$user->id.':'.implode(',', array_column($seeds, 'id'));
+        $cacheKey = 'recommendations:'.$user->id.':'.collect($seeds)
+            ->map(fn (array $seed) => $seed['media_type'].':'.$seed['id'])
+            ->implode(',');
 
         return response()->json([
             'results' => Cache::remember($cacheKey, now()->addMinutes(20), function () use ($user, $seeds) {
@@ -133,7 +204,7 @@ class TmdbController extends Controller
                 $responses = Http::pool(fn ($pool) => collect($seeds)->map(
                     fn (array $seed) => $pool
                         ->withOptions(['verify' => config('services.tmdb.verify_ssl', true)])
-                        ->get(self::BASE."/movie/{$seed['id']}/recommendations", [
+                        ->get(self::BASE."/{$seed['media_type']}/{$seed['id']}/recommendations", [
                             'api_key' => $key,
                             'language' => 'en-US',
                         ])
@@ -149,16 +220,18 @@ class TmdbController extends Controller
                     }
 
                     $seedWeight = $seeds[$index]['weight'];
+                    $mediaType = $seeds[$index]['media_type'];
 
                     foreach ($response->json('results') ?? [] as $position => $rec) {
                         $id = (int) ($rec['id'] ?? 0);
+                        $key = $mediaType.':'.$id;
 
-                        if ($id === 0 || $id === $seeds[$index]['id'] || isset($librarySet[$id])) {
+                        if ($id === 0 || $key === $mediaType.':'.$seeds[$index]['id'] || isset($librarySet[$key])) {
                             continue;
                         }
 
-                        $scores[$id] = ($scores[$id] ?? 0) + $seedWeight / ($position + 2);
-                        $candidates[$id] = $rec;
+                        $scores[$key] = ($scores[$key] ?? 0) + $seedWeight / ($position + 2);
+                        $candidates[$key] = $this->normalizeRec($rec, $mediaType);
                     }
                 }
 
@@ -166,8 +239,8 @@ class TmdbController extends Controller
 
                 $results = [];
 
-                foreach (array_keys($scores) as $id) {
-                    $results[] = $candidates[$id];
+                foreach (array_keys($scores) as $key) {
+                    $results[] = $candidates[$key];
 
                     if (count($results) >= 20) {
                         break;
@@ -192,14 +265,27 @@ class TmdbController extends Controller
         return 1;
     }
 
+    /**
+     * Flatten movies and TV shows into one display shape (TMDB TV results use
+     * name / first_air_date instead of title / release_date).
+     */
+    private function normalizeRec(array $rec, string $mediaType): array
+    {
+        $rec['media_type'] = $mediaType;
+        $rec['title'] = $rec['title'] ?? $rec['name'] ?? null;
+        $rec['release_date'] = $rec['release_date'] ?? $rec['first_air_date'] ?? null;
+
+        return $rec;
+    }
+
     private function libraryTmdbSet(int $userId): array
     {
         $movieIds = Watchlist::query()->where('user_id', $userId)->pluck('movie_id');
 
         return Movie::query()
             ->whereIn('id', $movieIds)
-            ->pluck('tmdb_id')
-            ->flip()
+            ->get()
+            ->mapWithKeys(fn (Movie $movie) => [($movie->media_type ?? 'movie').':'.$movie->tmdb_id => true])
             ->all();
     }
 }

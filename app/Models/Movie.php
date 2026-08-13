@@ -16,6 +16,9 @@ class Movie extends Model
         'vote_average',
         'media_type',
         'genres',
+        'number_of_seasons',
+        'number_of_episodes',
+        'seasons',
     ];
 
     protected function casts(): array
@@ -24,6 +27,9 @@ class Movie extends Model
             'release_date' => 'date',
             'vote_average' => 'float',
             'genres' => 'array',
+            'number_of_seasons' => 'integer',
+            'number_of_episodes' => 'integer',
+            'seasons' => 'array',
         ];
     }
 
