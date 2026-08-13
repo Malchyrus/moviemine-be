@@ -73,6 +73,7 @@ class AuthController extends Controller
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
             'username' => ['sometimes', 'nullable', 'string', 'max:50', 'unique:users,username,'.$user->id],
+            'email' => ['sometimes', 'string', 'email', 'max:255', 'unique:users,email,'.$user->id],
             'avatar' => ['sometimes', 'nullable', 'string'],
             'bio' => ['sometimes', 'nullable', 'string'],
             'preferences' => ['sometimes', 'array'],
@@ -80,7 +81,7 @@ class AuthController extends Controller
             'preferences.default_add_list_id' => ['sometimes', 'nullable', 'integer'],
         ]);
 
-        foreach (['name', 'username', 'avatar', 'bio'] as $field) {
+        foreach (['name', 'username', 'email', 'avatar', 'bio'] as $field) {
             if (array_key_exists($field, $validated)) {
                 $user->{$field} = $validated[$field];
             }
@@ -96,5 +97,24 @@ class AuthController extends Controller
         $user->save();
 
         return response()->json(['user' => $user->fresh()]);
+    }
+
+    public function changePassword(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', 'confirmed', Password::defaults()],
+        ]);
+
+        if (! Hash::check($validated['current_password'], $user->password)) {
+            return response()->json(['error' => 'Current password is incorrect'], 422);
+        }
+
+        $user->password = $validated['password'];
+        $user->save();
+
+        return response()->json(['ok' => true]);
     }
 }

@@ -37,6 +37,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::patch('/auth/me', [AuthController::class, 'updateMe']);
+    Route::post('/auth/password', [AuthController::class, 'changePassword']);
+
+    // Personalized recommendations
+    Route::get('/tmdb/recommendations', [TmdbController::class, 'recommendations']);
 
     // Library / watchlist
     Route::get('/movies', [WatchlistController::class, 'index']);
