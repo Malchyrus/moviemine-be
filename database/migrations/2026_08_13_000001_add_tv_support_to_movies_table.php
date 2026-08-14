@@ -9,7 +9,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        $this->dropTmdbIdUnique();
+        if (Schema::getConnection()->getDriverName() === 'pgsql') {
+            $this->upPgsql();
+
+            return;
+        }
 
         if (! Schema::hasIndex('movies', ['tmdb_id', 'media_type'])) {
             Schema::table('movies', function (Blueprint $table) {
@@ -32,6 +36,18 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (Schema::getConnection()->getDriverName() === 'pgsql') {
+            DB::statement(
+                'alter table "movies" '
+                .'drop constraint if exists "movies_tmdb_id_media_type_unique", '
+                .'drop column if exists number_of_seasons, '
+                .'drop column if exists number_of_episodes, '
+                .'drop column if exists seasons'
+            );
+
+            return;
+        }
+
         if (Schema::hasIndex('movies', ['tmdb_id', 'media_type'])) {
             Schema::table('movies', function (Blueprint $table) {
                 $table->dropUnique(['tmdb_id', 'media_type']);
@@ -45,43 +61,77 @@ return new class extends Migration
                 });
             }
         }
-
-        if (! Schema::hasIndex('movies', 'movies_tmdb_id_unique')) {
-            Schema::table('movies', function (Blueprint $table) {
-                $table->integer('tmdb_id')->unique()->change();
-            });
-        }
     }
 
-    protected function dropTmdbIdUnique(): void
+    protected function upPgsql(): void
     {
-        if (Schema::getConnection()->getDriverName() !== 'pgsql') {
-            if (Schema::hasIndex('movies', 'movies_tmdb_id_unique')) {
-                Schema::table('movies', function (Blueprint $table) {
-                    $table->dropUnique('movies_tmdb_id_unique');
-                });
-            }
+        DB::statement(<<<'SQL'
+            do $$
+            declare
+                drop_stmt text;
+            begin
+                for drop_stmt in
+                    select 'alter table "movies" drop constraint if exists "' || con.conname || '"'
+                    from pg_constraint con
+                    where con.conrelid = 'movies'::regclass
+                      and con.contype in ('p', 'u', 'c', 'f', 'x')
+                      and exists (
+                          select 1
+                          from pg_attribute att
+                          where att.attrelid = con.conrelid
+                            and att.attnum = any (con.conkey)
+                            and att.attname = 'tmdb_id'
+                      )
+                    union all
+                    select 'drop index if exists "' || i.relname || '"'
+                    from pg_index idx
+                    join pg_class i on i.oid = idx.indexrelid
+                    where idx.indrelid = 'movies'::regclass
+                      and idx.indisunique = true
+                      and not exists (
+                          select 1
+                          from pg_constraint con
+                          where con.conindid = idx.indexrelid
+                      )
+                      and not exists (
+                          select 1
+                          from pg_attribute att
+                          where att.attrelid = idx.indrelid
+                            and att.attnum = any (idx.indkey)
+                            and att.attnum > 0
+                            and att.attname <> 'tmdb_id'
+                      )
+                loop
+                    execute drop_stmt;
+                end loop;
 
-            return;
-        }
+                if not exists (
+                    select 1
+                    from pg_index idx
+                    join pg_class i on i.oid = idx.indexrelid
+                    where idx.indrelid = 'movies'::regclass
+                      and idx.indisunique = true
+                      and not idx.indisprimary
+                      and not exists (
+                          select 1
+                          from pg_attribute att
+                          where att.attrelid = idx.indrelid
+                            and att.attnum = any (idx.indkey)
+                            and att.attnum > 0
+                            and att.attname not in ('tmdb_id', 'media_type')
+                      )
+                ) then
+                    execute format('alter table "movies" add constraint %I unique (tmdb_id, media_type)', 'movies_tmdb_id_media_type_unique');
+                end if;
+            end
+            $$;
+            SQL);
 
-        foreach (Schema::getIndexes('movies') as $index) {
-            if (! $index['unique'] || $index['primary'] || $index['columns'] !== ['tmdb_id']) {
-                continue;
-            }
-
-            $constraint = DB::selectOne(
-                'select c.conname from pg_constraint c '
-                .'join pg_class ic on ic.oid = c.conindid '
-                .'where ic.relname = ?',
-                [$index['name']]
-            );
-
-            if ($constraint) {
-                DB::statement('alter table "movies" drop constraint "'.$constraint->conname.'"');
-            } else {
-                DB::statement('drop index "'.$index['name'].'"');
-            }
-        }
+        DB::statement(
+            'alter table "movies" '
+            .'add column if not exists number_of_seasons integer, '
+            .'add column if not exists number_of_episodes integer, '
+            .'add column if not exists seasons json'
+        );
     }
 };
