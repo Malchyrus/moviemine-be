@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    public $connection = 'pgsql_direct';
+
     public function up(): void
     {
         // The old single-column unique on tmdb_id (from create_movies_table)
