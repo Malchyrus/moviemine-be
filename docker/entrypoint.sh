@@ -12,9 +12,5 @@ php artisan config:cache
 
 php artisan view:cache
 
-which frankenphp
-ls -l $(which frankenphp)
-
-exec frankenphp run --config /app/Caddyfile
-
-exec /usr/local/bin/frankenphp run --config /app/Caddyfile
+exec /usr/local/bin/frankenphp run --config /app/Caddyfile \
+	|| exec php artisan serve --host=0.0.0.0 --port="${PORT:-80}"
