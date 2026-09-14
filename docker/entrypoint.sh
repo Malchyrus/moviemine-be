@@ -12,5 +12,4 @@ php artisan config:cache
 
 php artisan view:cache
 
-exec /usr/local/bin/frankenphp run --config /app/Caddyfile \
-	|| exec php artisan serve --host=0.0.0.0 --port="${PORT:-80}"
+exec php artisan serve --host=0.0.0.0 --port="${PORT:-80}"
